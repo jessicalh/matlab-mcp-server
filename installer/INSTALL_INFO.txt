@@ -1,0 +1,31 @@
+MATLAB MCP Server Installation
+================================
+
+This installer will set up the MATLAB MCP (Model Context Protocol) Server on your system.
+
+PREREQUISITES:
+--------------
+1. MATLAB must be installed on this computer (R2020b or later recommended)
+2. Standard MATLAB license (no web server license required)
+3. Claude Desktop application (or other MCP-compatible client)
+
+WHAT WILL BE INSTALLED:
+-----------------------
+- MATLAB MCP Server executable and dependencies
+- Configuration templates
+- Documentation
+
+IMPORTANT NOTES:
+----------------
+- The installer will ask for your MATLAB installation path
+- You will need to manually configure Claude Desktop after installation
+- The server communicates with MATLAB via the MATLAB Engine API
+- A local MATLAB installation is required - the server cannot run without it
+
+AFTER INSTALLATION:
+-------------------
+You will need to add the server configuration to Claude Desktop's config file.
+The installer will provide you with the exact configuration to use.
+
+For support and documentation, visit:
+https://github.com/yourusername/matlab-mcp-server
