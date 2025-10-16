@@ -1,6 +1,7 @@
 """Wrapper for MATLAB Engine API with comprehensive output capture."""
 
 import io
+import math
 import os
 from typing import Dict, Any, Optional, Tuple
 import matlab.engine
@@ -698,7 +699,6 @@ class MATLABEngineWrapper:
             num_figs = len(fig_handles)
 
             # Calculate grid layout
-            import math
             cols = int(math.ceil(math.sqrt(num_figs)))
             rows = int(math.ceil(num_figs / cols))
 
