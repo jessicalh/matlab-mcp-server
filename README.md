@@ -34,10 +34,18 @@ Building from source or development installations are **not officially supported
 
 ## Requirements
 
-- Windows (only supported platform)
-- Local MATLAB installation (R2020b or later)
-- Standard MATLAB license
+**Tested Platform:**
+- Windows (only supported OS)
+- MATLAB R2025b (25.2.0.2998904)
+- **⚠️ Other MATLAB versions are NOT tested and may not work**
+
+**Required Software:**
+- Local MATLAB R2025b installation
+- Valid MATLAB license (standard license, no special features required)
+- MATLAB Engine API for Python (installed via your MATLAB license)
 - Claude Desktop
+
+**Important:** You must install the MATLAB Engine API for Python from your own MATLAB installation. The installer cannot do this for you. This requires a valid MATLAB license.
 
 ## Configuration
 
