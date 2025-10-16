@@ -4,9 +4,9 @@
 import os
 import sys
 import asyncio
-import json
+import logging
+import traceback
 from typing import Any, Optional
-from pathlib import Path
 
 # Load environment variables
 from dotenv import load_dotenv
@@ -20,6 +20,17 @@ from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
 # Import our MATLAB wrapper
 from matlab_engine_wrapper import MATLABEngineWrapper
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('matlab_mcp_server.log'),
+        logging.StreamHandler(sys.stderr)
+    ]
+)
+logger = logging.getLogger(__name__)
+
 
 # Global MATLAB engine instance
 matlab_engine: Optional[MATLABEngineWrapper] = None
@@ -31,12 +42,17 @@ def get_matlab_engine() -> MATLABEngineWrapper:
 
     if matlab_engine is None:
         matlab_path = os.getenv("MATLAB_PATH")
+        logger.info(f"Initializing MATLAB engine with path: {matlab_path}")
         matlab_engine = MATLABEngineWrapper(matlab_path)
 
         # Start the engine
         result = matlab_engine.start()
         if not result["success"]:
-            raise RuntimeError(f"Failed to start MATLAB: {result.get('error', 'Unknown error')}")
+            error_msg = f"Failed to start MATLAB: {result.get('error', 'Unknown error')}"
+            logger.error(error_msg)
+            if result.get("traceback"):
+                logger.error(f"Traceback:\n{result['traceback']}")
+            raise RuntimeError(error_msg)
 
     return matlab_engine
 
@@ -408,7 +424,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
             )
 
             if result["success"]:
-                output = f"Figure exported successfully:\n"
+                output = "Figure exported successfully:\n"
                 output += f"Path: {result['path']}\n"
                 output += f"Format: {result['format']}"
 
@@ -496,7 +512,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
             if result["success"]:
                 output = f"✓ Project set to: {result['project_name']}\n"
                 output += f"Output directory: {result['project_dir']}\n"
-                output += f"\nAll files will be saved to this directory for the duration of the session."
+                output += "\nAll files will be saved to this directory for the duration of the session."
             else:
                 output = f"Error: {result['error']}"
 
@@ -557,9 +573,11 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
             )]
 
     except Exception as e:
+        logger.exception(f"Error executing tool '{name}': {e}")
+        tb = traceback.format_exc()
         return [TextContent(
             type="text",
-            text=f"Error executing tool '{name}': {str(e)}\n\nDetails: {type(e).__name__}"
+            text=f"Error executing tool '{name}': {str(e)}\n\nDetails: {type(e).__name__}\n\nTraceback:\n{tb}"
         )]
 
 

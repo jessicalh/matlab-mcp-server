@@ -1,10 +1,19 @@
 """Wrapper for MATLAB Engine API with comprehensive output capture."""
 
 import io
+import logging
 import math
 import os
-from typing import Dict, Any, Optional, Tuple
+import traceback
+from typing import Dict, Any, Optional
 import matlab.engine
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 class MATLABEngineWrapper:
@@ -46,25 +55,33 @@ class MATLABEngineWrapper:
             Dict with status and message
         """
         try:
+            logger.info("Starting MATLAB Engine...")
             if self.matlab_path:
                 # Set MATLAB path if provided
                 os.environ["MATLAB_PATH"] = self.matlab_path
+                logger.info(f"MATLAB path set to: {self.matlab_path}")
 
             self.engine = matlab.engine.start_matlab()
+            logger.info("MATLAB Engine started successfully")
 
             # Set up initial configuration
             self.engine.eval("format long;", nargout=0)  # Better numeric precision
 
+            matlab_version = self._get_matlab_version()
+            logger.info(f"MATLAB version: {matlab_version}")
+
             return {
                 "success": True,
                 "message": "MATLAB Engine started successfully",
-                "matlab_version": self._get_matlab_version()
+                "matlab_version": matlab_version
             }
         except Exception as e:
+            logger.exception(f"Failed to start MATLAB Engine: {e}")
             return {
                 "success": False,
                 "message": f"Failed to start MATLAB Engine: {str(e)}",
-                "error": str(e)
+                "error": str(e),
+                "traceback": traceback.format_exc()
             }
 
     def stop(self) -> Dict[str, Any]:
@@ -75,11 +92,18 @@ class MATLABEngineWrapper:
         """
         try:
             if self.engine:
+                logger.info("Stopping MATLAB Engine...")
                 self.engine.quit()
                 self.engine = None
+                logger.info("MATLAB Engine stopped successfully")
             return {"success": True, "message": "MATLAB Engine stopped"}
         except Exception as e:
-            return {"success": False, "message": f"Error stopping engine: {str(e)}"}
+            logger.exception(f"Error stopping MATLAB Engine: {e}")
+            return {
+                "success": False,
+                "message": f"Error stopping engine: {str(e)}",
+                "traceback": traceback.format_exc()
+            }
 
     def is_running(self) -> bool:
         """Check if MATLAB Engine is running."""
@@ -136,6 +160,8 @@ class MATLABEngineWrapper:
         stderr_buffer = io.StringIO()
 
         try:
+            logger.debug(f"Executing MATLAB code ({len(code)} characters)")
+
             # Execute with output capture
             if capture_output:
                 self.engine.eval(
@@ -152,6 +178,8 @@ class MATLABEngineWrapper:
 
             # Detect new figures created during execution
             new_figures = self._detect_new_figures(previous_figures)
+            if new_figures:
+                logger.info(f"Created {len(new_figures)} new figure(s): {new_figures}")
 
             result = {
                 "success": True,
@@ -198,9 +226,11 @@ class MATLABEngineWrapper:
 
                 # Downgrade success if validation finds critical issues
                 if validation["has_errors"]:
+                    logger.error(f"Critical validation errors found: {validation['issues']}")
                     result["success"] = False
                     result["error"] = "Execution completed but validation found critical issues"
                 elif validation["has_warnings"]:
+                    logger.warning(f"Validation warnings found: {validation['issues']}")
                     result["has_warnings"] = True
 
             # Auto-save script if configured
@@ -230,21 +260,25 @@ class MATLABEngineWrapper:
 
         except matlab.engine.MatlabExecutionError as e:
             # MATLAB execution error - code ran but had an error
+            logger.error(f"MATLAB execution error: {e}", exc_info=True)
             return {
                 "success": False,
                 "stdout": stdout_buffer.getvalue(),
                 "stderr": stderr_buffer.getvalue(),
                 "error": str(e),
-                "error_type": "MatlabExecutionError"
+                "error_type": "MatlabExecutionError",
+                "traceback": traceback.format_exc()
             }
         except Exception as e:
             # Other Python/Engine errors
+            logger.exception(f"Unexpected error during MATLAB execution: {e}")
             return {
                 "success": False,
                 "stdout": stdout_buffer.getvalue(),
                 "stderr": stderr_buffer.getvalue(),
                 "error": str(e),
-                "error_type": type(e).__name__
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc()
             }
         finally:
             stdout_buffer.close()
@@ -382,7 +416,7 @@ class MATLABEngineWrapper:
 
         try:
             # Determine figure handle
-            fig_ref = f"gcf" if figure_handle is None else f"figure({figure_handle})"
+            fig_ref = "gcf" if figure_handle is None else f"figure({figure_handle})"
 
             # Use exportgraphics (modern MATLAB) or fallback to print
             export_code = f"""
@@ -499,7 +533,8 @@ class MATLABEngineWrapper:
         try:
             version = self.engine.version(nargout=1)
             return str(version)
-        except:
+        except Exception as e:
+            logger.warning(f"Failed to get MATLAB version: {e}", exc_info=True)
             return "unknown"
 
     def _get_variable_info(self, var_name: str) -> Dict[str, Any]:
@@ -522,7 +557,8 @@ class MATLABEngineWrapper:
                 "class": var_class,
                 "size": list(size_result[0]) if hasattr(size_result, '__iter__') else [size_result]
             }
-        except:
+        except Exception as e:
+            logger.warning(f"Failed to get variable info for '{var_name}': {e}", exc_info=True)
             return {}
 
     def _get_figure_handles(self) -> list:
@@ -1025,7 +1061,7 @@ class MATLABEngineWrapper:
                 "variables_checked": len(var_names)
             }
 
-        except Exception as e:
+        except Exception:
             return {
                 "has_issues": False,
                 "has_critical": False,
