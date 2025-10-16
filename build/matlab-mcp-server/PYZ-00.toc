@@ -2406,7 +2406,10 @@
    'C:\\Program '
    'Files\\Python313\\Lib\\site-packages\\matlab\\engine\\matlabfuture.py',
    'PYMODULE'),
-  ('matlab_engine_wrapper',
+  ('matlab_mcp_server',
+   'C:\\projects\\matlabserver\\src\\matlab_mcp_server\\__init__.py',
+   'PYMODULE'),
+  ('matlab_mcp_server.matlab_engine_wrapper',
    'C:\\projects\\matlabserver\\src\\matlab_mcp_server\\matlab_engine_wrapper.py',
    'PYMODULE'),
   ('mcp',

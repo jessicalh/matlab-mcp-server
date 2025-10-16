@@ -277,10 +277,10 @@ imports:
  &#8226;   <a href="#genericpath">genericpath</a>
  &#8226;   <a href="#heapq">heapq</a>
  &#8226;   <a href="#io">io</a>
- &#8226;   <a href="#json">json</a>
  &#8226;   <a href="#keyword">keyword</a>
  &#8226;   <a href="#linecache">linecache</a>
  &#8226;   <a href="#locale">locale</a>
+ &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#matlab">matlab</a>
  &#8226;   <a href="#matlab.engine">matlab.engine</a>
  &#8226;   <a href="#matlab.engine.basefuture">matlab.engine.basefuture</a>
@@ -291,7 +291,7 @@ imports:
  &#8226;   <a href="#matlab.engine.futureresult">matlab.engine.futureresult</a>
  &#8226;   <a href="#matlab.engine.matlabengine">matlab.engine.matlabengine</a>
  &#8226;   <a href="#matlab.engine.matlabfuture">matlab.engine.matlabfuture</a>
- &#8226;   <a href="#matlab_engine_wrapper">matlab_engine_wrapper</a>
+ &#8226;   <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
  &#8226;   <a href="#mcp">mcp</a>
  &#8226;   <a href="#mcp.cli">mcp.cli</a>
  &#8226;   <a href="#mcp.cli.claude">mcp.cli.claude</a>
@@ -376,7 +376,6 @@ imports:
  &#8226;   <a href="#ntpath">ntpath</a>
  &#8226;   <a href="#operator">operator</a>
  &#8226;   <a href="#os">os</a>
- &#8226;   <a href="#pathlib">pathlib</a>
  &#8226;   <a href="#posixpath">posixpath</a>
  &#8226;   <a href="#pyi_rth_cryptography_openssl.py">pyi_rth_cryptography_openssl.py</a>
  &#8226;   <a href="#pyi_rth_inspect.py">pyi_rth_inspect.py</a>
@@ -13881,7 +13880,7 @@ imported by:
  &#8226;   <a href="#httpx._client">httpx._client</a>
  &#8226;   <a href="#httpx._models">httpx._models</a>
  &#8226;   <a href="#jsonschema._format">jsonschema._format</a>
- &#8226;   <a href="#matlab_engine_wrapper">matlab_engine_wrapper</a>
+ &#8226;   <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
  &#8226;   <a href="#mcp.client.session">mcp.client.session</a>
  &#8226;   <a href="#mcp.client.session_group">mcp.client.session_group</a>
  &#8226;   <a href="#mcp.client.streamable_http">mcp.client.streamable_http</a>
@@ -27611,7 +27610,7 @@ imported by:
  &#8226;   <a href="#logging.handlers">logging.handlers</a>
  &#8226;   <a href="#lzma">lzma</a>
  &#8226;   <a href="#matlab.engine.matlabengine">matlab.engine.matlabengine</a>
- &#8226;   <a href="#matlab_engine_wrapper">matlab_engine_wrapper</a>
+ &#8226;   <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
  &#8226;   <a href="#mcp.server.stdio">mcp.server.stdio</a>
  &#8226;   <a href="#multiprocessing.connection">multiprocessing.connection</a>
  &#8226;   <a href="#multiprocessing.popen_forkserver">multiprocessing.popen_forkserver</a>
@@ -28056,7 +28055,6 @@ imported by:
  &#8226;   <a href="#requests.compat">requests.compat</a>
  &#8226;   <a href="#rich.highlighter">rich.highlighter</a>
  &#8226;   <a href="#rich.json">rich.json</a>
- &#8226;   <a href="#server.py">server.py</a>
  &#8226;   <a href="#setuptools.config._validate_pyproject.error_reporting">setuptools.config._validate_pyproject.error_reporting</a>
  &#8226;   <a href="#setuptools.msvc">setuptools.msvc</a>
  &#8226;   <a href="#sse_starlette.event">sse_starlette.event</a>
@@ -28645,6 +28643,7 @@ imported by:
  &#8226;   <a href="#markdown_it.rules_block.paragraph">markdown_it.rules_block.paragraph</a>
  &#8226;   <a href="#markdown_it.rules_block.reference">markdown_it.rules_block.reference</a>
  &#8226;   <a href="#markdown_it.rules_core.replacements">markdown_it.rules_core.replacements</a>
+ &#8226;   <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
  &#8226;   <a href="#mcp.client.__main__">mcp.client.__main__</a>
  &#8226;   <a href="#mcp.client.auth">mcp.client.auth</a>
  &#8226;   <a href="#mcp.client.session">mcp.client.session</a>
@@ -28675,6 +28674,7 @@ imported by:
  &#8226;   <a href="#requests">requests</a>
  &#8226;   <a href="#rich.logging">rich.logging</a>
  &#8226;   <a href="#rich.segment">rich.segment</a>
+ &#8226;   <a href="#server.py">server.py</a>
  &#8226;   <a href="#setuptools._distutils._log">setuptools._distutils._log</a>
  &#8226;   <a href="#setuptools._distutils.cmd">setuptools._distutils.cmd</a>
  &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
@@ -30345,7 +30345,7 @@ imported by:
  &#8226;   <a href="#cryptography.hazmat.primitives.asymmetric.rsa">cryptography.hazmat.primitives.asymmetric.rsa</a>
  &#8226;   <a href="#dns.edns">dns.edns</a>
  &#8226;   <a href="#fractions">fractions</a>
- &#8226;   <a href="#matlab_engine_wrapper">matlab_engine_wrapper</a>
+ &#8226;   <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
  &#8226;   <a href="#more_itertools.more">more_itertools.more</a>
  &#8226;   <a href="#more_itertools.recipes">more_itertools.recipes</a>
  &#8226;   <a href="#numpy._core._internal">numpy._core._internal</a>
@@ -30452,7 +30452,7 @@ imported by:
  &#8226;   <a href="#matlab.engine.futureresult">matlab.engine.futureresult</a>
  &#8226;   <a href="#matlab.engine.matlabengine">matlab.engine.matlabengine</a>
  &#8226;   <a href="#matlab.engine.matlabfuture">matlab.engine.matlabfuture</a>
- &#8226;   <a href="#matlab_engine_wrapper">matlab_engine_wrapper</a>
+ &#8226;   <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
  &#8226;   <a href="#server.py">server.py</a>
 
   </div>
@@ -30658,16 +30658,31 @@ imported by:
 </div>
 
 <div class="node">
-  <a name="matlab_engine_wrapper"></a>
-  <a target="code" href="///C:/projects/matlabserver/src/matlab_mcp_server/matlab_engine_wrapper.py" type="text/plain"><tt>matlab_engine_wrapper</tt></a>
+  <a name="matlab_mcp_server"></a>
+  <a target="code" href="///C:/projects/matlabserver/src/matlab_mcp_server/__init__.py" type="text/plain"><tt>matlab_mcp_server</tt></a>
+<span class="moduletype">Package</span>  <div class="import">
+imported by:
+    <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="matlab_mcp_server.matlab_engine_wrapper"></a>
+  <a target="code" href="///C:/projects/matlabserver/src/matlab_mcp_server/matlab_engine_wrapper.py" type="text/plain"><tt>matlab_mcp_server.matlab_engine_wrapper</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#datetime">datetime</a>
  &#8226;   <a href="#io">io</a>
+ &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#math">math</a>
  &#8226;   <a href="#matlab.engine">matlab.engine</a>
+ &#8226;   <a href="#matlab_mcp_server">matlab_mcp_server</a>
+ &#8226;   <a href="#numpy">numpy</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#time">time</a>
+ &#8226;   <a href="#traceback">traceback</a>
  &#8226;   <a href="#typing">typing</a>
 
   </div>
@@ -34564,7 +34579,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#numpy">numpy</a>
+    <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
+ &#8226;   <a href="#numpy">numpy</a>
  &#8226;   <a href="#numpy.__config__">numpy.__config__</a>
  &#8226;   <a href="#numpy._array_api_info">numpy._array_api_info</a>
  &#8226;   <a href="#numpy._core">numpy._core</a>
@@ -41272,7 +41288,7 @@ imported by:
  &#8226;   <a href="#lzma">lzma</a>
  &#8226;   <a href="#matlab">matlab</a>
  &#8226;   <a href="#matlab.engine">matlab.engine</a>
- &#8226;   <a href="#matlab_engine_wrapper">matlab_engine_wrapper</a>
+ &#8226;   <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
  &#8226;   <a href="#mcp.cli.claude">mcp.cli.claude</a>
  &#8226;   <a href="#mcp.cli.cli">mcp.cli.cli</a>
  &#8226;   <a href="#mcp.client.stdio">mcp.client.stdio</a>
@@ -42012,7 +42028,6 @@ imported by:
  &#8226;   <a href="#rich.json">rich.json</a>
  &#8226;   <a href="#rich.logging">rich.logging</a>
  &#8226;   <a href="#rich.syntax">rich.syntax</a>
- &#8226;   <a href="#server.py">server.py</a>
  &#8226;   <a href="#setuptools._distutils.compilers.C.base">setuptools._distutils.compilers.C.base</a>
  &#8226;   <a href="#setuptools._distutils.dir_util">setuptools._distutils.dir_util</a>
  &#8226;   <a href="#setuptools._distutils.dist">setuptools._distutils.dist</a>
@@ -67252,7 +67267,7 @@ imported by:
  &#8226;   <a href="#logging.handlers">logging.handlers</a>
  &#8226;   <a href="#matlab.engine.basefuture">matlab.engine.basefuture</a>
  &#8226;   <a href="#matlab.engine.fevalfuture">matlab.engine.fevalfuture</a>
- &#8226;   <a href="#matlab_engine_wrapper">matlab_engine_wrapper</a>
+ &#8226;   <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
  &#8226;   <a href="#mcp.client.auth">mcp.client.auth</a>
  &#8226;   <a href="#mcp.server.auth.handlers.register">mcp.server.auth.handlers.register</a>
  &#8226;   <a href="#mcp.server.auth.handlers.token">mcp.server.auth.handlers.token</a>
@@ -67518,6 +67533,7 @@ imported by:
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#logging.config">logging.config</a>
+ &#8226;   <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
  &#8226;   <a href="#multiprocessing.managers">multiprocessing.managers</a>
  &#8226;   <a href="#multiprocessing.pool">multiprocessing.pool</a>
  &#8226;   <a href="#multiprocessing.process">multiprocessing.process</a>
@@ -68505,7 +68521,7 @@ imported by:
  &#8226;   <a href="#markdown_it.token">markdown_it.token</a>
  &#8226;   <a href="#markdown_it.utils">markdown_it.utils</a>
  &#8226;   <a href="#markupsafe">markupsafe</a>
- &#8226;   <a href="#matlab_engine_wrapper">matlab_engine_wrapper</a>
+ &#8226;   <a href="#matlab_mcp_server.matlab_engine_wrapper">matlab_mcp_server.matlab_engine_wrapper</a>
  &#8226;   <a href="#mcp.cli.claude">mcp.cli.claude</a>
  &#8226;   <a href="#mcp.cli.cli">mcp.cli.cli</a>
  &#8226;   <a href="#mcp.client.auth">mcp.client.auth</a>
