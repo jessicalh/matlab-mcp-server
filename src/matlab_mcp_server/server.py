@@ -18,7 +18,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
 
 # Import our MATLAB wrapper
-from matlab_engine_wrapper import MATLABEngineWrapper
+from matlab_mcp_server.matlab_engine_wrapper import MATLABEngineWrapper
 
 # Configure logging
 logging.basicConfig(
