@@ -625,6 +625,115 @@ class MATLABEngineWrapper:
                 "error": f"Failed to position figures: {str(e)}"
             }
 
+    def _get_monitor_info(self) -> Dict[str, Any]:
+        """Get information about all monitors.
+
+        Returns:
+            Dict with monitor information
+        """
+        try:
+            # Get monitor positions
+            monitor_pos = self.engine.eval("get(0, 'MonitorPositions')", nargout=1)
+
+            # Convert to list of monitor info
+            if len(monitor_pos.shape) == 1:
+                # Single monitor
+                monitors = [{
+                    "left": int(monitor_pos[0]),
+                    "bottom": int(monitor_pos[1]),
+                    "width": int(monitor_pos[2]),
+                    "height": int(monitor_pos[3]),
+                    "is_primary": True
+                }]
+            else:
+                # Multiple monitors
+                monitors = []
+                for i in range(monitor_pos.shape[0]):
+                    monitors.append({
+                        "left": int(monitor_pos[i][0]),
+                        "bottom": int(monitor_pos[i][1]),
+                        "width": int(monitor_pos[i][2]),
+                        "height": int(monitor_pos[i][3]),
+                        "is_primary": (i == 0)  # First monitor is primary
+                    })
+
+            return {
+                "success": True,
+                "monitor_count": len(monitors),
+                "monitors": monitors
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to get monitor info: {str(e)}"
+            }
+
+    def _position_figures_tile(self, monitor_index: int = 0) -> Dict[str, Any]:
+        """Position figures in a tile pattern on specified monitor.
+
+        Args:
+            monitor_index: Which monitor to use (0 = primary)
+
+        Returns:
+            Dict with positioning results
+        """
+        try:
+            # Get monitor info
+            monitor_info = self._get_monitor_info()
+            if not monitor_info["success"]:
+                return monitor_info
+
+            monitors = monitor_info["monitors"]
+            if monitor_index >= len(monitors):
+                monitor_index = 0  # Fall back to primary
+
+            monitor = monitors[monitor_index]
+
+            # Get figures
+            fig_handles = self._get_figure_handles()
+            if not fig_handles:
+                return {"success": True, "figures_positioned": 0}
+
+            num_figs = len(fig_handles)
+
+            # Calculate grid layout
+            import math
+            cols = int(math.ceil(math.sqrt(num_figs)))
+            rows = int(math.ceil(num_figs / cols))
+
+            # Calculate figure sizes
+            margin = 10
+            usable_width = monitor["width"] - (cols + 1) * margin
+            usable_height = monitor["height"] - (rows + 1) * margin - 100  # Leave room for taskbar
+
+            fig_width = usable_width // cols
+            fig_height = usable_height // rows
+
+            # Position figures in grid
+            for i, fig_handle in enumerate(fig_handles):
+                row = i // cols
+                col = i % cols
+
+                x = monitor["left"] + margin + col * (fig_width + margin)
+                y = monitor["bottom"] + monitor["height"] - (row + 1) * (fig_height + margin) - 100
+
+                position_cmd = f"set({fig_handle}, 'Position', [{x}, {y}, {fig_width}, {fig_height}]);"
+                self.engine.eval(position_cmd, nargout=0)
+
+            return {
+                "success": True,
+                "figures_positioned": num_figs,
+                "strategy": "tile",
+                "monitor": monitor_index
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to tile figures: {str(e)}"
+            }
+
     def _check_matlab_warnings(self) -> Dict[str, Any]:
         """Check for MATLAB warnings using lastwarn.
 
@@ -839,6 +948,89 @@ class MATLABEngineWrapper:
                 "plot_object_count": None,
                 "details": {},
                 "issues": [f"Could not validate figure: {str(e)}"]
+            }
+
+    def _check_workspace_health(self) -> Dict[str, Any]:
+        """Check workspace for common problematic values (NaN, Inf, empty arrays).
+
+        Returns:
+            Dict containing:
+                - has_issues: bool
+                - has_critical: bool
+                - issues: list of issue dicts
+                - variables_checked: int
+        """
+        try:
+            # Get list of variables in workspace
+            var_names_result = self.engine.eval("who()", nargout=1)
+            var_names = list(var_names_result) if var_names_result else []
+
+            issues = []
+            has_critical = False
+
+            # Check a subset of variables (don't check everything to avoid performance issues)
+            # Focus on recently created/modified variables
+            for var_name in var_names[:10]:  # Limit to first 10 variables
+                try:
+                    # Check if variable contains NaN
+                    has_nan = self.engine.eval(
+                        f"any(isnan({var_name})(:))",
+                        nargout=1
+                    )
+
+                    # Check if variable contains Inf
+                    has_inf = self.engine.eval(
+                        f"any(isinf({var_name})(:))",
+                        nargout=1
+                    )
+
+                    # Check if variable is empty
+                    is_empty = self.engine.eval(
+                        f"isempty({var_name})",
+                        nargout=1
+                    )
+
+                    if has_nan:
+                        issues.append({
+                            "type": "nan_detected",
+                            "severity": "warning",
+                            "message": f"Variable '{var_name}' contains NaN values",
+                            "variable": var_name
+                        })
+
+                    if has_inf:
+                        issues.append({
+                            "type": "inf_detected",
+                            "severity": "warning",
+                            "message": f"Variable '{var_name}' contains Inf values",
+                            "variable": var_name
+                        })
+
+                    if is_empty:
+                        issues.append({
+                            "type": "empty_variable",
+                            "severity": "info",
+                            "message": f"Variable '{var_name}' is empty",
+                            "variable": var_name
+                        })
+
+                except Exception:
+                    # Skip variables that can't be checked (might be non-numeric types)
+                    continue
+
+            return {
+                "has_issues": len(issues) > 0,
+                "has_critical": has_critical,
+                "issues": issues,
+                "variables_checked": len(var_names)
+            }
+
+        except Exception as e:
+            return {
+                "has_issues": False,
+                "has_critical": False,
+                "issues": [],
+                "variables_checked": 0
             }
 
     def _auto_save_script(

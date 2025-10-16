@@ -227,6 +227,21 @@ async def list_tools() -> list[Tool]:
                 "properties": {}
             }
         ),
+        Tool(
+            name="position_all_figures",
+            description="Reposition all open MATLAB figure windows on screen using specified strategy (cascade or tile). Useful if figures are off-screen or overlapping.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "strategy": {
+                        "type": "string",
+                        "enum": ["cascade", "tile"],
+                        "description": "Positioning strategy to use (default: cascade)",
+                        "default": "cascade"
+                    }
+                }
+            }
+        ),
     ]
 
 
@@ -514,6 +529,22 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
                         output += f"{i}. {proj}{marker}\n"
                 else:
                     output = result.get("message", "No projects found")
+            else:
+                output = f"Error: {result['error']}"
+
+            return [TextContent(type="text", text=output)]
+
+        elif name == "position_all_figures":
+            strategy = arguments.get("strategy", "cascade")
+
+            if strategy == "tile":
+                result = engine._position_figures_tile()
+            else:
+                result = engine._position_figures_cascade()
+
+            if result["success"]:
+                fig_count = result.get("figures_positioned", 0)
+                output = f"✓ Repositioned {fig_count} figure(s) using {strategy} strategy"
             else:
                 output = f"Error: {result['error']}"
 
