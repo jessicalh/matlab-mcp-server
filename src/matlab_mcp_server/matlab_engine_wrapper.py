@@ -22,6 +22,19 @@ class MATLABEngineWrapper:
         self.current_project: Optional[str] = None
         self.current_project_dir: Optional[str] = None
 
+        # Auto-positioning configuration
+        self.auto_position_figures = os.getenv("MATLAB_AUTO_POSITION", "true").lower() == "true"
+        self.positioning_strategy = os.getenv("MATLAB_POSITION_STRATEGY", "cascade")  # cascade, tile, center
+
+        # Auto-save script configuration
+        self.auto_save_scripts = os.getenv("MATLAB_AUTO_SAVE_SCRIPTS", "true").lower() == "true"
+        self.auto_save_mode = os.getenv("MATLAB_AUTO_SAVE_MODE", "on_figures")  # always, on_figures, never
+
+        # Validation configuration
+        self.validate_results = os.getenv("MATLAB_VALIDATE_RESULTS", "true").lower() == "true"
+        self.check_workspace_health = os.getenv("MATLAB_CHECK_WORKSPACE_HEALTH", "false").lower() == "true"
+        self.strict_validation = os.getenv("MATLAB_STRICT_VALIDATION", "false").lower() == "true"
+
         # Create workspace directory if it doesn't exist
         os.makedirs(self.workspace_dir, exist_ok=True)
 
@@ -71,26 +84,52 @@ class MATLABEngineWrapper:
         """Check if MATLAB Engine is running."""
         return self.engine is not None
 
-    def execute(self, code: str, capture_output: bool = True) -> Dict[str, Any]:
-        """Execute MATLAB code with comprehensive output capture.
+    def execute(
+        self,
+        code: str,
+        capture_output: bool = True,
+        auto_position_figures: bool = True,
+        validate_results: bool = True,
+        auto_save_script: Optional[bool] = None
+    ) -> Dict[str, Any]:
+        """Execute MATLAB code with comprehensive output capture and validation.
 
         Args:
             code: MATLAB code to execute
             capture_output: Whether to capture stdout/stderr (default True)
+            auto_position_figures: Whether to automatically position new figures (default True)
+            validate_results: Whether to validate execution results (default True)
+            auto_save_script: Whether to auto-save script. If None, uses configured setting
 
         Returns:
             Dict containing:
-                - success: bool
+                - success: bool (True only if execution AND validation pass)
                 - stdout: captured standard output
                 - stderr: captured error output
                 - error: error message if execution failed
-                - warnings: any MATLAB warnings
+                - warnings: MATLAB warnings captured
+                - validation: validation results with severity levels
+                - figures_created: number of new figures
+                - figures_validated: validation results for each figure
+                - new_figure_handles: list of new figure handles
+                - figures_positioned: number of figures positioned (if auto_position_figures=True)
+                - script_saved: path if script was saved
         """
         if not self.is_running():
             return {
                 "success": False,
                 "error": "MATLAB Engine is not running. Call start() first."
             }
+
+        # Get figure handles BEFORE execution to detect new figures
+        previous_figures = self._get_figure_handles()
+
+        # Clear last warning BEFORE execution
+        if validate_results:
+            try:
+                self.engine.eval("lastwarn('');", nargout=0)
+            except Exception:
+                pass  # Silently ignore if this fails
 
         stdout_buffer = io.StringIO()
         stderr_buffer = io.StringIO()
@@ -110,12 +149,83 @@ class MATLABEngineWrapper:
             stdout_content = stdout_buffer.getvalue()
             stderr_content = stderr_buffer.getvalue()
 
-            return {
+            # Detect new figures created during execution
+            new_figures = self._detect_new_figures(previous_figures)
+
+            result = {
                 "success": True,
                 "stdout": stdout_content,
                 "stderr": stderr_content,
-                "output": stdout_content  # Alias for convenience
+                "output": stdout_content,  # Alias for convenience
+                "figures_created": len(new_figures),
+                "new_figure_handles": new_figures
             }
+
+            # Perform validation if requested
+            if validate_results:
+                validation = {"has_errors": False, "has_warnings": False, "warnings": [], "figures": [], "issues": []}
+
+                # Check for MATLAB warnings
+                warning_check = self._check_matlab_warnings()
+                if warning_check["warnings"]:
+                    validation["warnings"] = warning_check["warnings"]
+                    validation["issues"].extend(warning_check["issues"])
+
+                    if warning_check["has_critical"]:
+                        validation["has_errors"] = True
+                    else:
+                        validation["has_warnings"] = True
+
+                # Validate new figures
+                if new_figures:
+                    for fig_handle in new_figures:
+                        fig_validation = self._validate_figure_content(fig_handle)
+                        validation["figures"].append(fig_validation)
+
+                        if not fig_validation["is_valid"]:
+                            issue = {
+                                "type": "blank_figure",
+                                "severity": "warning",
+                                "message": f"Figure {fig_handle} appears to be empty or blank",
+                                "details": fig_validation
+                            }
+                            validation["issues"].append(issue)
+                            validation["has_warnings"] = True
+
+                result["validation"] = validation
+                result["figures_validated"] = validation["figures"]
+
+                # Downgrade success if validation finds critical issues
+                if validation["has_errors"]:
+                    result["success"] = False
+                    result["error"] = "Execution completed but validation found critical issues"
+                elif validation["has_warnings"]:
+                    result["has_warnings"] = True
+
+            # Auto-save script if configured
+            save_script = auto_save_script if auto_save_script is not None else self.auto_save_scripts
+
+            # Determine if we should save (always, or only when figures created)
+            should_save = save_script and (
+                self.auto_save_mode == "always" or
+                (self.auto_save_mode == "on_figures" and len(new_figures) > 0)
+            )
+
+            if should_save:
+                script_result = self._auto_save_script(
+                    code,
+                    figures_created=len(new_figures),
+                    validation=result.get("validation")
+                )
+                if script_result.get("success"):
+                    result["script_saved"] = script_result.get("path")
+
+            # Auto-position new figures if requested
+            if auto_position_figures and len(new_figures) > 0:
+                position_result = self._position_figures_cascade()
+                result["figures_positioned"] = position_result.get("figures_positioned", 0)
+
+            return result
 
         except matlab.engine.MatlabExecutionError as e:
             # MATLAB execution error - code ran but had an error
@@ -413,6 +523,394 @@ class MATLABEngineWrapper:
             }
         except:
             return {}
+
+    def _get_figure_handles(self) -> list:
+        """Get list of current figure handles.
+
+        Returns:
+            List of figure handles (empty list if none or error)
+        """
+        try:
+            fig_handles = self.engine.eval("get(groot, 'Children')", nargout=1)
+            if not fig_handles:
+                return []
+            if not hasattr(fig_handles, '__iter__'):
+                return [fig_handles]
+            return list(fig_handles)
+        except Exception:
+            return []
+
+    def _detect_new_figures(self, previous_handles: list) -> list:
+        """Detect newly created figures by comparing handle lists.
+
+        Args:
+            previous_handles: List of figure handles before code execution
+
+        Returns:
+            List of new figure handles
+        """
+        try:
+            current_handles = self._get_figure_handles()
+
+            # Convert to sets for comparison
+            prev_set = set(previous_handles) if previous_handles else set()
+            curr_set = set(current_handles)
+
+            # Find new handles
+            new_handles = list(curr_set - prev_set)
+            return new_handles
+
+        except Exception:
+            return []
+
+    def _position_figures_cascade(self) -> Dict[str, Any]:
+        """Position all open figures in a cascade pattern on the primary screen.
+
+        Returns:
+            Dict with success status and number of figures positioned
+        """
+        if not self.is_running():
+            return {"success": False, "error": "Engine not running"}
+
+        try:
+            # Get screen dimensions
+            screen_size = self.engine.eval("get(0, 'ScreenSize')", nargout=1)
+            # screen_size = [left, bottom, width, height]
+            screen_width = int(screen_size[2])
+            screen_height = int(screen_size[3])
+
+            # Get all figure handles
+            fig_handles = self._get_figure_handles()
+
+            if not fig_handles:
+                return {"success": True, "figures_positioned": 0}
+
+            # Default figure size (can be customized)
+            fig_width = min(800, int(screen_width * 0.6))
+            fig_height = min(600, int(screen_height * 0.6))
+
+            # Cascade offset
+            cascade_offset = 40
+
+            # Starting position (with margin from edges)
+            start_x = 50
+            start_y = screen_height - fig_height - 100  # From top of screen
+
+            positioned_count = 0
+            for i, fig_handle in enumerate(fig_handles):
+                # Calculate cascade position
+                x = start_x + (i * cascade_offset)
+                y = start_y - (i * cascade_offset)
+
+                # Reset cascade if going off screen
+                if (x + fig_width > screen_width - 50) or (y < 50):
+                    x = start_x
+                    y = start_y
+
+                # Set figure position
+                # Note: MATLAB Position is [left, bottom, width, height]
+                position_cmd = f"set({fig_handle}, 'Position', [{x}, {y}, {fig_width}, {fig_height}]);"
+                self.engine.eval(position_cmd, nargout=0)
+                positioned_count += 1
+
+            return {
+                "success": True,
+                "figures_positioned": positioned_count,
+                "strategy": "cascade"
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to position figures: {str(e)}"
+            }
+
+    def _check_matlab_warnings(self) -> Dict[str, Any]:
+        """Check for MATLAB warnings using lastwarn.
+
+        Returns:
+            Dict containing:
+                - warnings: list of warning dicts with message and ID
+                - has_critical: bool - whether any critical warnings found
+                - issues: list of issue dicts for validation system
+        """
+        try:
+            # Get last warning message and ID
+            self.engine.eval("[warnMsg, warnId] = lastwarn;", nargout=0)
+            warn_msg = self.engine.workspace.get("warnMsg", "")
+            warn_id = self.engine.workspace.get("warnId", "")
+
+            warnings = []
+            issues = []
+            has_critical = False
+
+            if warn_msg and warn_msg.strip():
+                # Categorize warning severity
+                severity, is_critical = self._classify_warning_severity(warn_msg, warn_id)
+
+                warning_entry = {
+                    "message": warn_msg,
+                    "id": warn_id,
+                    "severity": severity
+                }
+                warnings.append(warning_entry)
+
+                if is_critical:
+                    has_critical = True
+
+                # Create issue entry
+                issues.append({
+                    "type": "matlab_warning",
+                    "severity": severity,
+                    "message": warn_msg,
+                    "warning_id": warn_id
+                })
+
+            return {
+                "warnings": warnings,
+                "has_critical": has_critical,
+                "issues": issues
+            }
+
+        except Exception as e:
+            return {
+                "warnings": [],
+                "has_critical": False,
+                "issues": [{
+                    "type": "warning_check_failed",
+                    "severity": "info",
+                    "message": f"Could not check warnings: {str(e)}"
+                }]
+            }
+
+    def _classify_warning_severity(self, warn_msg: str, warn_id: str) -> tuple:
+        """Classify warning severity based on message and ID.
+
+        Args:
+            warn_msg: Warning message text
+            warn_id: Warning identifier
+
+        Returns:
+            Tuple of (severity_level, is_critical)
+            severity_level: 'critical', 'warning', 'info'
+            is_critical: bool - whether this should cause success=False
+        """
+        warn_msg_lower = warn_msg.lower()
+
+        # Critical warnings that indicate results are likely invalid
+        critical_keywords = [
+            "singular",
+            "rank deficient",
+            "badly scaled",
+            "ill-conditioned",
+            "not positive definite"
+        ]
+
+        critical_ids = [
+            "MATLAB:singularMatrix",
+            "MATLAB:nearlySingularMatrix",
+            "MATLAB:illConditionedMatrix",
+            "MATLAB:rankDeficientMatrix"
+        ]
+
+        # Check for critical conditions
+        for keyword in critical_keywords:
+            if keyword in warn_msg_lower:
+                return ("critical", True)
+
+        if warn_id in critical_ids:
+            return ("critical", True)
+
+        # Non-critical but important warnings
+        warning_keywords = [
+            "divide by zero",
+            "imaginary parts",
+            "negative",
+            "overflow",
+            "underflow"
+        ]
+
+        for keyword in warning_keywords:
+            if keyword in warn_msg_lower:
+                return ("warning", False)
+
+        # Default to info level
+        return ("info", False)
+
+    def _validate_figure_content(self, fig_handle) -> Dict[str, Any]:
+        """Check if a figure contains actual plot content or is blank.
+
+        Args:
+            fig_handle: MATLAB figure handle
+
+        Returns:
+            Dict containing:
+                - is_valid: bool - whether figure has content
+                - has_axes: bool - whether figure has axes
+                - axes_count: int - number of axes in figure
+                - plot_object_count: int - total plot objects across all axes
+                - details: dict with per-axes information
+                - issues: list of issues found
+        """
+        try:
+            # Check if figure has any axes
+            self.engine.eval(
+                f"axesHandles = findobj({fig_handle}, 'type', 'axes');",
+                nargout=0
+            )
+            axes_handles = self.engine.workspace.get("axesHandles", [])
+
+            # Convert to list
+            if not hasattr(axes_handles, '__iter__'):
+                axes_handles = [axes_handles] if axes_handles else []
+
+            has_axes = len(axes_handles) > 0
+
+            if not has_axes:
+                return {
+                    "is_valid": False,
+                    "has_axes": False,
+                    "axes_count": 0,
+                    "plot_object_count": 0,
+                    "details": {},
+                    "issues": ["Figure has no axes"]
+                }
+
+            # Check each axes for plot objects
+            total_plot_objects = 0
+            axes_details = []
+            axes_issues = []
+
+            for i, ax_handle in enumerate(axes_handles):
+                # Count children in this axes
+                children_count = self.engine.eval(
+                    f"numel(get({ax_handle}, 'Children'))",
+                    nargout=1
+                )
+
+                # Get types of plot objects
+                self.engine.eval(
+                    f"""
+                    ch = get({ax_handle}, 'Children');
+                    if isempty(ch)
+                        types = {{}};
+                    else
+                        types = get(ch, 'Type');
+                        if ~iscell(types)
+                            types = {{types}};
+                        end
+                    end
+                    """,
+                    nargout=0
+                )
+                plot_types_list = self.engine.workspace.get("types", [])
+
+                axes_info = {
+                    "axes_index": i,
+                    "children_count": int(children_count),
+                    "plot_types": list(plot_types_list) if plot_types_list else []
+                }
+                axes_details.append(axes_info)
+
+                total_plot_objects += int(children_count)
+
+                # Check if axes is empty
+                if int(children_count) == 0:
+                    axes_issues.append(f"Axes {i+1} is empty (no plot objects)")
+
+            # Determine if figure is valid
+            # A figure is valid if it has at least one axes with at least one plot object
+            is_valid = total_plot_objects > 0
+
+            return {
+                "is_valid": is_valid,
+                "has_axes": True,
+                "axes_count": len(axes_handles),
+                "plot_object_count": total_plot_objects,
+                "details": axes_details,
+                "issues": axes_issues if not is_valid else []
+            }
+
+        except Exception as e:
+            return {
+                "is_valid": True,  # Assume valid if we can't check (fail open)
+                "has_axes": None,
+                "axes_count": None,
+                "plot_object_count": None,
+                "details": {},
+                "issues": [f"Could not validate figure: {str(e)}"]
+            }
+
+    def _auto_save_script(
+        self,
+        code: str,
+        figures_created: int = 0,
+        validation: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Automatically save a script to the scripts directory with metadata.
+
+        Args:
+            code: MATLAB code to save
+            figures_created: Number of figures created by this script
+            validation: Validation results to include in header
+
+        Returns:
+            Dict with save status and file path
+        """
+        from datetime import datetime
+
+        try:
+            # Create scripts subdirectory
+            scripts_dir = os.path.join(self.workspace_dir, "scripts")
+            os.makedirs(scripts_dir, exist_ok=True)
+
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"script_{timestamp}.m"
+            filepath = os.path.join(scripts_dir, filename)
+
+            # Build comprehensive header
+            header_lines = [
+                "% Auto-saved MATLAB script",
+                f"% Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"% Figures created: {figures_created}",
+                f"% Project: {self.current_project or 'None'}",
+            ]
+
+            # Add validation info if available
+            if validation:
+                if validation.get("warnings"):
+                    header_lines.append("%")
+                    header_lines.append("% MATLAB Warnings:")
+                    for warn in validation["warnings"]:
+                        header_lines.append(f"%   - {warn['message']}")
+
+                if validation.get("issues"):
+                    header_lines.append("%")
+                    header_lines.append("% Issues detected:")
+                    for issue in validation["issues"]:
+                        severity = issue.get("severity", "info").upper()
+                        header_lines.append(f"%   [{severity}] {issue['message']}")
+
+            header_lines.append("%")
+            header_lines.append("")
+            header = "\n".join(header_lines) + "\n"
+
+            with open(filepath, 'w') as f:
+                f.write(header)
+                f.write(code)
+
+            return {
+                "success": True,
+                "path": filepath,
+                "message": f"Script auto-saved to {filepath}"
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to auto-save script: {str(e)}"
+            }
 
     def set_project(self, project_name: str) -> Dict[str, Any]:
         """Set the current project and create project directory in Documents.

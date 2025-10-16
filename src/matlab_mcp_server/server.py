@@ -51,7 +51,16 @@ async def list_tools() -> list[Tool]:
     return [
         Tool(
             name="execute_matlab_code",
-            description="Execute MATLAB code with full output capture including stdout, stderr, warnings, and errors. Returns all debugging information.",
+            description="""Execute MATLAB code with full output capture including stdout, stderr, warnings, and errors.
+
+            IMPORTANT: When plots/figures are created, they will automatically pop up in MATLAB GUI windows
+            for immediate user interaction. Figures are automatically positioned on-screen in a cascade pattern
+            to ensure they are visible and not off-screen.
+
+            You do NOT need to manually export figures unless the user specifically requests saved image files.
+            The figures will be displayed for the user to interact with directly in MATLAB.
+
+            Returns all debugging information and metadata about figures created.""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -62,6 +71,11 @@ async def list_tools() -> list[Tool]:
                     "capture_output": {
                         "type": "boolean",
                         "description": "Whether to capture output (default: true)",
+                        "default": True
+                    },
+                    "position_figures": {
+                        "type": "boolean",
+                        "description": "Whether to auto-position new figures on screen (default: true)",
                         "default": True
                     }
                 },
@@ -225,14 +239,74 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
         if name == "execute_matlab_code":
             code = arguments["code"]
             capture_output = arguments.get("capture_output", True)
+            position_figures = arguments.get("position_figures", True)
+            validate = arguments.get("validate_results", True)
+            save_script = arguments.get("save_script")
 
-            result = engine.execute(code, capture_output=capture_output)
+            result = engine.execute(
+                code,
+                capture_output=capture_output,
+                auto_position_figures=position_figures,
+                validate_results=validate,
+                auto_save_script=save_script
+            )
 
             # Format output for display
             output_parts = []
 
             if result.get("success"):
-                output_parts.append("✓ Execution successful\n")
+                # Check if there are warnings even though it "succeeded"
+                if result.get("has_warnings"):
+                    output_parts.append("⚠️  Execution completed with warnings\n")
+                else:
+                    output_parts.append("✓ Execution successful\n")
+
+                # Display validation issues if any
+                validation = result.get("validation", {})
+                if validation.get("issues"):
+                    output_parts.append("\n⚠️  Issues detected:\n")
+                    for issue in validation["issues"]:
+                        severity_emoji = {
+                            "critical": "🔴",
+                            "warning": "⚠️ ",
+                            "info": "ℹ️ "
+                        }.get(issue.get("severity", "info"), "•")
+                        output_parts.append(f"  {severity_emoji} {issue['message']}\n")
+                    output_parts.append("\n")
+
+                # Display MATLAB warnings
+                if validation.get("warnings"):
+                    output_parts.append("MATLAB Warnings:\n")
+                    for warn in validation["warnings"]:
+                        output_parts.append(f"  • {warn['message']}\n")
+                        if warn.get("id"):
+                            output_parts.append(f"    (ID: {warn['id']})\n")
+                    output_parts.append("\n")
+
+                # Display figure information if figures were created
+                if result.get("figures_created", 0) > 0:
+                    fig_count = result["figures_created"]
+                    output_parts.append(f"📊 {fig_count} figure(s) created and displayed in MATLAB GUI\n")
+
+                    # Report on figure validation
+                    fig_validations = validation.get("figures", [])
+                    for i, fig_val in enumerate(fig_validations, 1):
+                        if not fig_val.get("is_valid"):
+                            output_parts.append(f"   ⚠️  Figure {i} appears to be blank or empty\n")
+                            if fig_val.get("issues"):
+                                for issue in fig_val["issues"]:
+                                    output_parts.append(f"      - {issue}\n")
+                        else:
+                            plot_count = fig_val.get("plot_object_count", 0)
+                            output_parts.append(f"   ✓ Figure {i} contains {plot_count} plot object(s)\n")
+
+                    if result.get("figures_positioned"):
+                        output_parts.append(f"   Positioned {result['figures_positioned']} figure(s) on screen\n")
+                    output_parts.append("\n")
+
+                # Display script save info
+                if result.get("script_saved"):
+                    output_parts.append(f"💾 Script saved: {result['script_saved']}\n\n")
 
                 if result.get("stdout"):
                     output_parts.append(f"Output:\n{result['stdout']}\n")
@@ -240,11 +314,20 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
                 if result.get("stderr"):
                     output_parts.append(f"Warnings/Messages:\n{result['stderr']}\n")
 
-                if not result.get("stdout") and not result.get("stderr"):
+                if not result.get("stdout") and not result.get("stderr") and result.get("figures_created", 0) == 0:
                     output_parts.append("(No output produced)\n")
+
             else:
                 output_parts.append("✗ Execution failed\n")
                 output_parts.append(f"Error: {result.get('error', 'Unknown error')}\n")
+
+                # Display validation issues that caused failure
+                validation = result.get("validation", {})
+                if validation.get("issues"):
+                    output_parts.append("\nCritical issues:\n")
+                    for issue in validation["issues"]:
+                        if issue.get("severity") == "critical":
+                            output_parts.append(f"  🔴 {issue['message']}\n")
 
                 if result.get("stdout"):
                     output_parts.append(f"\nOutput before error:\n{result['stdout']}\n")
