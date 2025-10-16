@@ -561,16 +561,48 @@ class MATLABEngineWrapper:
         """Get list of current figure handles.
 
         Returns:
-            List of figure handles (empty list if none or error)
+            List of figure handles as floats (empty list if none or error)
         """
         try:
-            fig_handles = self.engine.eval("get(groot, 'Children')", nargout=1)
-            if not fig_handles:
+            # Get figure handles and convert to numeric array IN MATLAB
+            # This avoids matlab.object conversion issues in Python
+            # The Number property of graphics handles gives the figure number
+            self.engine.eval("""
+                temp_figs = get(groot, 'Children');
+                if isempty(temp_figs)
+                    temp_fig_numbers = [];
+                else
+                    % Get Number property from each figure (works for all MATLAB versions)
+                    temp_fig_numbers = arrayfun(@(f) f.Number, temp_figs);
+                end
+            """, nargout=0)
+
+            # Now retrieve the numeric array
+            fig_numbers = self.engine.workspace["temp_fig_numbers"]
+
+            if fig_numbers is None:
                 return []
-            if not hasattr(fig_handles, '__iter__'):
-                return [fig_handles]
-            return list(fig_handles)
-        except Exception:
+
+            # Convert to Python list
+            if hasattr(fig_numbers, '_data'):
+                # matlab.double with _data attribute
+                import numpy as np
+                handles = [float(x) for x in np.array(fig_numbers._data).flatten()]
+            elif hasattr(fig_numbers, '__iter__'):
+                # Iterable (list or array)
+                handles = [float(x) for x in fig_numbers]
+            elif fig_numbers == 0 or (hasattr(fig_numbers, '__len__') and len(fig_numbers) == 0):
+                # Empty
+                return []
+            else:
+                # Single number
+                handles = [float(fig_numbers)]
+
+            logger.debug(f"Retrieved {len(handles)} figure handle(s): {handles}")
+            return handles
+
+        except Exception as e:
+            logger.exception(f"Failed to get figure handles: {e}")
             return []
 
     def _detect_new_figures(self, previous_handles: list) -> list:
@@ -585,15 +617,22 @@ class MATLABEngineWrapper:
         try:
             current_handles = self._get_figure_handles()
 
-            # Convert to sets for comparison
+            logger.debug(f"Figure detection - Previous: {previous_handles}, Current: {current_handles}")
+
+            # Convert to sets for comparison (now that handles are floats, they're hashable)
             prev_set = set(previous_handles) if previous_handles else set()
             curr_set = set(current_handles)
 
             # Find new handles
             new_handles = list(curr_set - prev_set)
+
+            if new_handles:
+                logger.info(f"Detected {len(new_handles)} new figure(s): {new_handles}")
+
             return new_handles
 
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to detect new figures: {e}", exc_info=True)
             return []
 
     def _position_figures_cascade(self) -> Dict[str, Any]:
@@ -778,8 +817,17 @@ class MATLABEngineWrapper:
         try:
             # Get last warning message and ID
             self.engine.eval("[warnMsg, warnId] = lastwarn;", nargout=0)
-            warn_msg = self.engine.workspace.get("warnMsg", "")
-            warn_id = self.engine.workspace.get("warnId", "")
+
+            # Access workspace variables directly (they should exist after eval)
+            try:
+                warn_msg = self.engine.workspace["warnMsg"]
+                warn_id = self.engine.workspace["warnId"]
+            except (KeyError, TypeError):
+                # Variables not found or workspace access issue
+                warn_msg = ""
+                warn_id = ""
+
+            logger.debug(f"Warning check - Message: '{warn_msg}', ID: '{warn_id}'")
 
             warnings = []
             issues = []
@@ -814,6 +862,7 @@ class MATLABEngineWrapper:
             }
 
         except Exception as e:
+            logger.warning(f"Failed to check MATLAB warnings: {e}", exc_info=True)
             return {
                 "warnings": [],
                 "has_critical": False,
@@ -899,7 +948,7 @@ class MATLABEngineWrapper:
                 f"axesHandles = findobj({fig_handle}, 'type', 'axes');",
                 nargout=0
             )
-            axes_handles = self.engine.workspace.get("axesHandles", [])
+            axes_handles = self.engine.workspace["axesHandles"] if "axesHandles" in self.engine.workspace else []
 
             # Convert to list
             if not hasattr(axes_handles, '__iter__'):
@@ -944,7 +993,7 @@ class MATLABEngineWrapper:
                     """,
                     nargout=0
                 )
-                plot_types_list = self.engine.workspace.get("types", [])
+                plot_types_list = self.engine.workspace["types"] if "types" in self.engine.workspace else []
 
                 axes_info = {
                     "axes_index": i,
