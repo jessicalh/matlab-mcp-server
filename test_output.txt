@@ -1,0 +1,61 @@
+C:\Program Files\Python313\Lib\site-packages\matlab\__init__.py:158: UserWarning: Python versions 3.9, 3.10, 3.11, and 3.12 are supported, but your version of Python is 3_13
+  warnings.warn('Python versions 3.9, 3.10, 3.11, and 3.12 are supported, but your version of Python is %s' % _version)
+C:\Program Files\Python313\Lib\site-packages\matlab\engine\__init__.py:43: UserWarning: MATLAB Engine for Python supports Python version 3.9, 3.10, 3.11, and 3.12, but your version of Python is 3_13
+  warnings.warn('MATLAB Engine for Python supports Python version'
+2025-10-16 15:17:23,661 - matlab_mcp_server.matlab_engine_wrapper - INFO - Starting MATLAB Engine...
+2025-10-16 15:17:23,670 - matlab_mcp_server.matlab_engine_wrapper - INFO - MATLAB path set to: C:\Program Files\MATLAB\R2025b
+2025-10-16 15:17:26,156 - matlab_mcp_server.matlab_engine_wrapper - INFO - MATLAB Engine started successfully
+2025-10-16 15:17:26,181 - matlab_mcp_server.matlab_engine_wrapper - INFO - MATLAB version: 25.2.0.2998904 (R2025b)
+2025-10-16 15:17:34,035 - matlab_mcp_server.matlab_engine_wrapper - INFO - Stopping MATLAB Engine...
+2025-10-16 15:17:34,038 - matlab_mcp_server.matlab_engine_wrapper - INFO - MATLAB Engine stopped successfully
+
+============================================================
+MATLAB MCP Server - Direct Testing
+============================================================
+MATLAB Path: C:\Program Files\MATLAB\R2025b
+============================================================
+
+============================================================
+TEST 1: Import Modules
+============================================================
+Importing MATLAB Engine Wrapper...
+  [OK] MATLABEngineWrapper imported
+Importing MCP Server...
+  [OK] Server module imported
+
+============================================================
+TEST 2: MATLAB Engine Wrapper
+============================================================
+Creating wrapper instance...
+  [OK] Wrapper created
+Starting MATLAB Engine...
+  [OK] MATLAB Engine started
+       Version: 25.2.0.2998904 (R2025b)
+
+Testing simple execution...
+  [OK] Execution successful
+       Output: 2
+       Figures created: 0
+
+Testing figure creation...
+  [OK] Figure creation successful
+       Figures created: 0
+       Figures positioned: 0
+
+Testing blank figure detection...
+  [WARN] Blank figure not detected (may be expected)
+
+Testing critical warning detection...
+  [INFO] No warnings captured (MATLAB version may vary)
+
+Stopping MATLAB Engine...
+  [OK] Engine stopped
+
+============================================================
+TEST SUMMARY
+============================================================
+[PASS] Imports
+[PASS] Engine Wrapper
+============================================================
+
+Detailed logs written to: matlab_mcp_server.log

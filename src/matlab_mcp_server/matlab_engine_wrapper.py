@@ -8,11 +8,7 @@ import traceback
 from typing import Dict, Any, Optional
 import matlab.engine
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Get logger for this module (configured in server.py)
 logger = logging.getLogger(__name__)
 
 
