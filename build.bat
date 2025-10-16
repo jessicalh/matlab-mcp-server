@@ -128,7 +128,7 @@ REM Create LICENSE file if it doesn't exist
 if not exist LICENSE (
     echo MIT License > LICENSE
     echo. >> LICENSE
-    echo Copyright (c) 2025 MATLAB MCP Server Project >> LICENSE
+    echo Copyright ^(c^) 2025 MATLAB MCP Server Project >> LICENSE
 )
 
 REM Build installer

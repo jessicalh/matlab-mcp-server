@@ -65,14 +65,16 @@ begin
     'Where is MATLAB installed?',
     'Please select the folder where MATLAB is installed, then click Next.' + #13#10 + #13#10 +
     'Example paths:' + #13#10 +
-    '  C:\Program Files\MATLAB\R2024b' + #13#10 +
-    '  C:\Program Files\MATLAB\R2023b',
+    '  C:\Program Files\MATLAB\R2025b' + #13#10 +
+    '  C:\Program Files\MATLAB\R2024b',
     False, '');
 
   MatlabPathPage.Add('MATLAB Installation Path:');
 
   { Try to find MATLAB automatically }
-  if DirExists('C:\Program Files\MATLAB\R2024b') then
+  if DirExists('C:\Program Files\MATLAB\R2025b') then
+    MatlabPathPage.Values[0] := 'C:\Program Files\MATLAB\R2025b'
+  else if DirExists('C:\Program Files\MATLAB\R2024b') then
     MatlabPathPage.Values[0] := 'C:\Program Files\MATLAB\R2024b'
   else if DirExists('C:\Program Files\MATLAB\R2023b') then
     MatlabPathPage.Values[0] := 'C:\Program Files\MATLAB\R2023b';

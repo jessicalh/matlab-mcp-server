@@ -4,9 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -47,3 +45,11 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Documentation (keep local, don't push to GitHub except README.md)
+*.md
+!README.md
+
+# Build artifacts (we want these committed)
+!build/
+!dist/
