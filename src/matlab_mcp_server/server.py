@@ -56,29 +56,39 @@ from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
 from matlab_mcp_server.matlab_engine_wrapper import MATLABEngineWrapper
 
 
-# Global MATLAB engine instance
-matlab_engine: Optional[MATLABEngineWrapper] = None
+# Thread-local storage for MATLAB engine (to avoid thread affinity issues)
+import threading
+thread_local = threading.local()
 
 
 def get_matlab_engine() -> MATLABEngineWrapper:
-    """Get or initialize MATLAB engine instance."""
-    global matlab_engine
+    """Get or initialize MATLAB engine instance (thread-local).
 
-    if matlab_engine is None:
+    Note: MATLAB engine initialization is synchronous and can take a few seconds.
+    Each thread gets its own MATLAB engine instance to avoid thread affinity issues.
+    """
+    # Use thread-local storage to ensure each thread has its own engine
+    if not hasattr(thread_local, 'matlab_engine') or thread_local.matlab_engine is None:
         matlab_path = os.getenv("MATLAB_PATH")
         logger.info(f"Initializing MATLAB engine with path: {matlab_path}")
-        matlab_engine = MATLABEngineWrapper(matlab_path)
 
-        # Start the engine
-        result = matlab_engine.start()
+        # Create the wrapper instance
+        thread_local.matlab_engine = MATLABEngineWrapper(matlab_path)
+
+        # Start the engine (synchronous)
+        result = thread_local.matlab_engine.start()
+
         if not result["success"]:
             error_msg = f"Failed to start MATLAB: {result.get('error', 'Unknown error')}"
             logger.error(error_msg)
             if result.get("traceback"):
                 logger.error(f"Traceback:\n{result['traceback']}")
+            thread_local.matlab_engine = None  # Reset on failure
             raise RuntimeError(error_msg)
 
-    return matlab_engine
+        logger.info("MATLAB engine initialized successfully")
+
+    return thread_local.matlab_engine
 
 
 # Create MCP server instance
@@ -288,8 +298,19 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageContent | EmbeddedResource]:
     """Handle tool execution requests."""
+    logger.info(f"call_tool called with name={name}")
+
+    # Write to file immediately to ensure we see it
+    if not getattr(sys, 'frozen', False):
+        with open('call_tool_debug.log', 'a') as f:
+            f.write(f"call_tool called: {name} at {datetime.now()}\n")
+            f.flush()
+
     try:
+        # Get or initialize MATLAB engine directly (not in thread pool to avoid thread affinity issues)
+        logger.info("Getting MATLAB engine...")
         engine = get_matlab_engine()
+        logger.info(f"Got engine: {engine}")
 
         if name == "execute_matlab_code":
             code = arguments["code"]
@@ -298,13 +319,23 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
             validate = arguments.get("validate_results", True)
             save_script = arguments.get("save_script")
 
-            result = engine.execute(
-                code,
-                capture_output=capture_output,
-                auto_position_figures=position_figures,
-                validate_results=validate,
-                auto_save_script=save_script
-            )
+            # Execute MATLAB code in thread pool to avoid blocking async loop
+            logger.info(f"About to execute MATLAB code: {code[:50]}...")
+            try:
+                # Use asyncio.to_thread for Python 3.9+ (cleaner than run_in_executor)
+                import asyncio
+                result = await asyncio.to_thread(
+                    engine.execute,
+                    code,
+                    capture_output=capture_output,
+                    auto_position_figures=position_figures,
+                    validate_results=validate,
+                    auto_save_script=save_script
+                )
+                logger.info(f"MATLAB execution completed: success={result.get('success')}")
+            except Exception as e:
+                logger.exception(f"Error during MATLAB execution: {e}")
+                raise
 
             # Format output for display
             output_parts = []
@@ -394,6 +425,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
 
         elif name == "get_workspace_variable":
             var_name = arguments["variable_name"]
+            # Direct synchronous call
             result = engine.get_variable(var_name)
 
             if result["success"]:
@@ -407,6 +439,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
             return [TextContent(type="text", text=output)]
 
         elif name == "list_workspace":
+            # Direct synchronous call
             result = engine.list_workspace()
 
             if result["success"]:
@@ -422,6 +455,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
 
         elif name == "clear_workspace":
             variables = arguments.get("variables")
+            # Direct synchronous call
             result = engine.clear_workspace(variables)
 
             if result["success"]:
@@ -440,6 +474,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
             format_type = arguments.get("format", "png")
             dpi = arguments.get("dpi")
 
+            # Direct synchronous call
             result = engine.export_figure(
                 figure_handle=figure_handle,
                 filename=filename,
@@ -464,7 +499,10 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
             dpi = arguments.get("dpi")
 
             # Get list of open figures
-            fig_result = engine.execute("fig_handles = get(groot, 'Children');", capture_output=False)
+            fig_result = engine.execute(
+                "fig_handles = get(groot, 'Children');",
+                capture_output=False
+            )
 
             if not fig_result["success"]:
                 return [TextContent(type="text", text=f"Error getting figures: {fig_result['error']}")]
@@ -486,6 +524,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
                 for i, handle in enumerate(handles):
                     result = engine.export_figure(
                         figure_handle=int(handle),
+                        filename=None,
                         format=format_type,
                         dpi=dpi
                     )
@@ -662,5 +701,6 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\nShutting down MATLAB MCP Server...")
-        if matlab_engine:
-            matlab_engine.stop()
+        # Clean up any thread-local engines
+        if hasattr(thread_local, 'matlab_engine') and thread_local.matlab_engine:
+            thread_local.matlab_engine.stop()

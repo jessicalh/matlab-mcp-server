@@ -46,10 +46,11 @@ Thumbs.db
 # Logs
 *.log
 
-# Documentation (keep local, don't push to GitHub except README.md)
-*.md
+# Documentation
+!SETUP_INSTRUCTIONS.md
 !README.md
 
-# Build artifacts (we want these committed)
-!build/
-!dist/
+# Build artifacts
+build/
+dist/
+*.spec
