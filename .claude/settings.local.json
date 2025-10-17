@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(chmod:*)",
+      "Read(//mnt/c/Users/**)",
+      "Read(//mnt/c/**)",
+      "Bash(python:*)",
+      "Bash(python3 -m pip install:*)",
+      "Bash(python3:*)",
+      "Bash(python.exe:*)",
+      "Bash(cat:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(git init:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git tag:*)",
+      "Bash(git log:*)",
+      "Bash(git rm:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(dir:*)",
+      "Bash(matlab-mcp-server.exe:*)",
+      "Bash(.matlab-mcp-server.exe:*)",
+      "Bash(dist\\matlab-mcp-server\\matlab-mcp-server.exe:*)",
+      "Bash(./dist/matlab-mcp-server/matlab-mcp-server.exe:*)",
+      "Bash(pyinstaller:*)",
+      "Bash(./dist/matlab-mcp-server-fixed/matlab-mcp-server.exe)",
+      "Bash(./dist/matlab-mcp-server-v2/matlab-mcp-server.exe:*)",
+      "Bash(git reset:*)",
+      "Read(//c/Users/jessi/AppData/Roaming/Claude/**)",
+      "Bash(./matlab-mcp-server.exe)",
+      "Read(//c/Users/jessi/AppData/Local/AnthropicClaude/app-0.13.64/**)",
+      "Bash(taskkill:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

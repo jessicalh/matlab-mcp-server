@@ -5,21 +5,31 @@ import os
 import sys
 import logging
 import traceback
+from datetime import datetime
 
 # Configure logging FIRST before any other imports
-# For PyInstaller executables, file logging might fail, so make it optional
+# For PyInstaller executables, we MUST NOT log to stderr as it interferes with MCP protocol
 handlers = []
-try:
-    # Only try file logging if not in a frozen executable or if explicitly enabled
-    if not getattr(sys, 'frozen', False) or os.environ.get('MATLAB_MCP_LOG_FILE'):
-        log_file = os.environ.get('MATLAB_MCP_LOG_FILE', 'matlab_mcp_server.log')
-        handlers.append(logging.FileHandler(log_file, mode='a'))
-except Exception:
-    # If file handler fails, continue without it
-    pass
 
-# Always add stderr handler for MCP communication
-handlers.append(logging.StreamHandler(sys.stderr))
+# Only add file logging if not frozen or explicitly requested
+if not getattr(sys, 'frozen', False):
+    # Development mode - log to both file and stderr
+    try:
+        handlers.append(logging.FileHandler('matlab_mcp_server.log', mode='a'))
+    except Exception:
+        pass
+    handlers.append(logging.StreamHandler(sys.stderr))
+elif os.environ.get('MATLAB_MCP_LOG_FILE'):
+    # Frozen but file logging requested
+    try:
+        log_file = os.environ.get('MATLAB_MCP_LOG_FILE')
+        handlers.append(logging.FileHandler(log_file, mode='a'))
+    except Exception:
+        pass
+
+# Configure logging - if no handlers, add a NullHandler to prevent issues
+if not handlers:
+    handlers.append(logging.NullHandler())
 
 logging.basicConfig(
     level=logging.INFO,
@@ -597,12 +607,54 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent | ImageConten
 
 async def main():
     """Main entry point for the MCP server."""
-    async with stdio_server() as (read_stream, write_stream):
-        await app.run(
-            read_stream,
-            write_stream,
-            app.create_initialization_options()
-        )
+    # Write to debug file if frozen
+    if getattr(sys, 'frozen', False):
+        debug_file = os.path.join(os.path.dirname(sys.executable), 'matlab_mcp_debug.log')
+        with open(debug_file, 'a') as f:
+            f.write(f"main() called at {datetime.now()}\n")
+            f.flush()
+
+    logger.info("Starting MCP server main loop...")
+    try:
+        if getattr(sys, 'frozen', False):
+            with open(debug_file, 'a') as f:
+                f.write("About to enter stdio_server context...\n")
+                f.flush()
+
+        async with stdio_server() as (read_stream, write_stream):
+            if getattr(sys, 'frozen', False):
+                with open(debug_file, 'a') as f:
+                    f.write(f"stdio_server context established: read={read_stream}, write={write_stream}\n")
+                    f.flush()
+
+            logger.info("stdio_server context established")
+            logger.info(f"Read stream: {read_stream}")
+            logger.info(f"Write stream: {write_stream}")
+
+            if getattr(sys, 'frozen', False):
+                with open(debug_file, 'a') as f:
+                    f.write("About to call app.run()...\n")
+                    f.flush()
+
+            await app.run(
+                read_stream,
+                write_stream,
+                app.create_initialization_options()
+            )
+
+            if getattr(sys, 'frozen', False):
+                with open(debug_file, 'a') as f:
+                    f.write("app.run() completed\n")
+                    f.flush()
+
+            logger.info("MCP server run completed")
+    except Exception as e:
+        if getattr(sys, 'frozen', False):
+            with open(debug_file, 'a') as f:
+                f.write(f"Exception in main: {e}\n{traceback.format_exc()}\n")
+                f.flush()
+        logger.exception(f"Error in main loop: {e}")
+        raise
 
 
 if __name__ == "__main__":
