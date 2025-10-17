@@ -43,7 +43,7 @@ hiddenimports = matlab_hiddenimports + mcp_hiddenimports + [
 
 # Analysis
 a = Analysis(
-    ['src/matlab_mcp_server/server.py'],
+    ['src/matlab_mcp_server/main.py'],
     pathex=[
         'src/matlab_mcp_server',
         matlab_bin_path,  # Add MATLAB bin path

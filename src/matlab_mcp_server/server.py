@@ -7,13 +7,24 @@ import logging
 import traceback
 
 # Configure logging FIRST before any other imports
+# For PyInstaller executables, file logging might fail, so make it optional
+handlers = []
+try:
+    # Only try file logging if not in a frozen executable or if explicitly enabled
+    if not getattr(sys, 'frozen', False) or os.environ.get('MATLAB_MCP_LOG_FILE'):
+        log_file = os.environ.get('MATLAB_MCP_LOG_FILE', 'matlab_mcp_server.log')
+        handlers.append(logging.FileHandler(log_file, mode='a'))
+except Exception:
+    # If file handler fails, continue without it
+    pass
+
+# Always add stderr handler for MCP communication
+handlers.append(logging.StreamHandler(sys.stderr))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('matlab_mcp_server.log', mode='a'),
-        logging.StreamHandler(sys.stderr)
-    ],
+    handlers=handlers,
     force=True  # Force reconfiguration if already configured
 )
 logger = logging.getLogger(__name__)
